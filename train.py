@@ -157,7 +157,7 @@ for epoch in tqdm.tqdm(range(opts.num_epochs)):
 
             data = data_dict['datasets'].to(device)
 
-            output_dict = model.sample_conditional(data, num_samples_per_dataset=50)
+            output_dict = model.sample_conditional(data, num_samples_per_dataset=5)
             losses = {'NLL': loss_dict['NLL'].forward(output_dict)}
 
             logger.log_data(output_dict, losses, split='test')
