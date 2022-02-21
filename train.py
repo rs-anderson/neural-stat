@@ -92,11 +92,11 @@ dataset_module = importlib.import_module('_'.join(['dataset', opts.experiment]))
 
 train_dataset = dataset_module.get_dataset(opts, split='train')
 train_dataloader = DataLoader(train_dataset, batch_size=opts.batch_size, 
-    shuffle=True, num_workers=10)
+    shuffle=True, num_workers=6)
 
 test_dataset = dataset_module.get_dataset(opts, split='val')
 test_dataloader = DataLoader(test_dataset, batch_size=opts.batch_size, 
-    shuffle=True, num_workers=10)
+    shuffle=True, num_workers=6)
 test_batch = next(iter(test_dataloader))
 
 # Initialize the Neural Statistician model in models.py
