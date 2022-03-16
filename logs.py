@@ -143,10 +143,10 @@ class Logger:
     def grid(self, inputs, samples, summaries=None, ncols=10, mode = 'test'):
 
         inputs = inputs.data.cpu().numpy()
-        samples = samples.view(-1, 50, 2).data.cpu().numpy()
+        samples = samples.view(-1, 200, 2).data.cpu().numpy()
         if summaries is not None:
             summaries = summaries.data.cpu().numpy()
-        fig, axs = plt.subplots(nrows=2, ncols=ncols, figsize=(ncols, 2))
+        fig, axs = plt.subplots(nrows=3, ncols=ncols, figsize=(ncols, 2))
 
         def plot_single(ax, points, s, color):
             ax.scatter(points[:, 0], points[:, 1], s=s,  color=color)
@@ -159,10 +159,10 @@ class Logger:
         if inputs.shape[0] > 5:
             for i in range(ncols):
                 plot_single(axs[0, i], inputs[i], s=5, color='C0')
-                plot_single(axs[1, i], samples[i], s=5, color='C1')
+                plot_single(axs[2, i], samples[i], s=5, color='C1')
 
                 if summaries is not None:
-                    plot_single(axs[0, i], summaries[i], s=10, color='red')
+                    plot_single(axs[1, i], summaries[i], s=10, color='red')
 
             fig.subplots_adjust(wspace=0.05, hspace=0.05)
             plt.tight_layout()
