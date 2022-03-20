@@ -48,7 +48,7 @@ parser.add_argument('--x_dim', type=int, default=1, help='dimension of input')
 parser.add_argument('--h_dim', type=int, default=4096, help='dimension of input')
 
 # Logging options
-parser.add_argument('--model_name', type=str, default='omniglot_10:02:2020_22:24:41/last')
+parser.add_argument('--model_name', type=str, default='omniglot/new/280')
 parser.add_argument('--model_dir', type=str, default='model_params')
 parser.add_argument('--result_dir', type=str, default='results')
 
@@ -59,7 +59,7 @@ opts = parser.parse_args()
 dataset_module = importlib.import_module('_'.join(['dataset', opts.experiment, 'accuracy']))
 
 test_dataset = dataset_module.get_dataset(opts)
-test_dataset.sample_experiment()
+# test_dataset.sample_experiment()
 
 test_dataloader = DataLoader(test_dataset, batch_size=opts.batch_size, shuffle=False)
 
@@ -80,8 +80,11 @@ with torch.no_grad():
 
     accuracies = []
 
-    for _ in tqdm.tqdm(range(100)):
+    np.random.seed(2022)
 
+    for _ in tqdm.tqdm(range(100)):
+        
+        test_dataset.sample_experiment()
         test_dataset.set_train()
 
         means_classes = []
@@ -95,6 +98,7 @@ with torch.no_grad():
             logvars_classes += [output_dict['logvars_context'].cpu()]
             labels_classes += [data_dict['targets']]
 
+        # import ipdb; ipdb.set_trace()
         means_classes = torch.cat(means_classes, dim=0)
         logvars_classes = torch.cat(logvars_classes, dim=0)
         labels_classes = torch.cat(labels_classes, dim=0)
@@ -104,7 +108,7 @@ with torch.no_grad():
         means = []
         logvars = []
         labels = []
-
+        # import ipdb; ipdb.set_trace()
         for i, data_dict in enumerate(test_dataloader):
             data = data_dict['datasets'].cuda()
             output_dict = model.context_params(data)
@@ -135,7 +139,7 @@ with torch.no_grad():
 
         accuracies += [accuracy]
 
-        test_dataset.sample_experiment()
+        # test_dataset.sample_experiment()
 
 accuracy = np.array(accuracies, dtype=np.float).mean()
 
