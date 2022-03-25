@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 
 from utils import sample_from_normal
 
+import math
+
 # configuration for 'mnist' experienment
 # --experiment 'mnist' --num_epochs 100 --context_dim 64 --num_stochastic_layers 3 --z_dim 2 --x_dim 2 --h_dim 2
 
@@ -117,6 +119,23 @@ kl_per_epoch = []
 
 iters_per_epoch = (train_dataset.spatial.shape[0] // opts.batch_size)
 
+def frange_cycle_linear(start, stop, n_epoch, n_cycle=4, ratio=0.5):
+    L = np.ones(n_epoch)
+    period = n_epoch/n_cycle
+    step = (stop-start)/(period*ratio) # linear schedule
+
+    for c in range(n_cycle):
+
+        v , i = start , 0
+        while v <= stop and (int(i+c*period) < n_epoch):
+            L[int(i+c*period)] = v
+            v += step
+            i += 1
+    return L
+
+beta_np_cyc = frange_cycle_linear(0.0, 1.0, opts.num_epochs, 4, .5)
+# import ipdb; ipdb.set_trace()
+
 for epoch in tqdm.tqdm(range(opts.num_epochs)):
     model.train()
 
@@ -137,7 +156,8 @@ for epoch in tqdm.tqdm(range(opts.num_epochs)):
             losses[key] = loss_dict[key].forward(output_dict)
 
         # Can weigh the contribution from each term
-        losses['sum'] = (1 + alpha)*losses['NLL'] + losses['KL']/(1 + alpha)
+        # losses['sum'] = (1 + alpha)*losses['NLL'] + losses['KL']/(1 + alpha)
+        losses['sum'] = losses['NLL'] + losses['KL']*beta_np_cyc[epoch]
 
         # Compute gradients, and take step backward
         losses['sum'].backward()
@@ -163,7 +183,7 @@ for epoch in tqdm.tqdm(range(opts.num_epochs)):
     recon_loss_per_epoch.append(epoch_recon_loss)
     kl_per_epoch.append(epoch_kl)
 
-    alpha *= 0.5
+    # alpha *= 0.5
 
     if epoch % opts.save_freq == 0:
 
