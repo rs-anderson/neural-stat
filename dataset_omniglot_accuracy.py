@@ -48,8 +48,8 @@ class OmniglotDataset(Dataset):
         if self.mnist:
             total_num_classes = 10
         else:
-            # total_num_classes = np.arange(659-428, 659) # 659
-            total_num_classes = 659
+            total_num_classes = np.arange(659-428, 659) # 659
+            # total_num_classes = 659
         classes_for_experiment = np.random.choice(total_num_classes, size=self.num_classes, replace=False)
         return classes_for_experiment
 

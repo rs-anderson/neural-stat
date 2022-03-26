@@ -12,6 +12,8 @@ from logs import get_logger
 from torchvision.utils import make_grid
 from PIL import Image
 from losses import KLDivergence
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 
 parser = argparse.ArgumentParser(description='Arguments for test procedure')
 
@@ -48,7 +50,7 @@ parser.add_argument('--x_dim', type=int, default=1, help='dimension of input')
 parser.add_argument('--h_dim', type=int, default=4096, help='dimension of input')
 
 # Logging options
-parser.add_argument('--model_name', type=str, default='omniglot/new/280')
+parser.add_argument('--model_name', type=str, default='omniglot/samples_x-means_c-400_epochs/last')
 parser.add_argument('--model_dir', type=str, default='model_params')
 parser.add_argument('--result_dir', type=str, default='results')
 
@@ -77,71 +79,114 @@ os.makedirs(f'{opts.result_dir}/{opts.model_name}', exist_ok=True)
 dataset_name = 'mnist' if opts.test_mnist else 'omniglot'
 
 with torch.no_grad():
+    overall_accuracies = []
+    for k in range(50):
+        accuracies = []
+        pred_labels_list = []
+        true_labels_list = []
 
-    accuracies = []
+        np.random.seed(k) # 2021
 
-    np.random.seed(2022)
+        for _ in tqdm.tqdm(range(100)):
+            
+            test_dataset.sample_experiment()
+            test_dataset.set_train()
 
-    for _ in tqdm.tqdm(range(100)):
-        
-        test_dataset.sample_experiment()
-        test_dataset.set_train()
+            means_classes = []
+            logvars_classes = []
+            labels_classes = []
 
-        means_classes = []
-        logvars_classes = []
-        labels_classes = []
+            for i, data_dict in enumerate(test_dataloader):
+                data = data_dict['datasets'].cuda()
+                output_dict = model.context_params(data)
+                means_classes += [output_dict['means_context'].cpu()]
+                logvars_classes += [output_dict['logvars_context'].cpu()]
+                labels_classes += [data_dict['targets']]
 
-        for i, data_dict in enumerate(test_dataloader):
-            data = data_dict['datasets'].cuda()
-            output_dict = model.context_params(data)
-            means_classes += [output_dict['means_context'].cpu()]
-            logvars_classes += [output_dict['logvars_context'].cpu()]
-            labels_classes += [data_dict['targets']]
+            # import ipdb; ipdb.set_trace()
+            means_classes = torch.cat(means_classes, dim=0)
+            logvars_classes = torch.cat(logvars_classes, dim=0)
+            labels_classes = torch.cat(labels_classes, dim=0)
 
-        # import ipdb; ipdb.set_trace()
-        means_classes = torch.cat(means_classes, dim=0)
-        logvars_classes = torch.cat(logvars_classes, dim=0)
-        labels_classes = torch.cat(labels_classes, dim=0)
+            test_dataset.set_test()
 
-        test_dataset.set_test()
+            means = []
+            logvars = []
+            labels = []
 
-        means = []
-        logvars = []
-        labels = []
-        # import ipdb; ipdb.set_trace()
-        for i, data_dict in enumerate(test_dataloader):
-            data = data_dict['datasets'].cuda()
-            output_dict = model.context_params(data)
-            means += [output_dict['means_context'].cpu()]
-            logvars += [output_dict['logvars_context'].cpu()]
-            labels += [data_dict['targets']]
+            for i, data_dict in enumerate(test_dataloader):
+                data = data_dict['datasets'].cuda()
+                output_dict = model.context_params(data)
+                means += [output_dict['means_context'].cpu()]
+                logvars += [output_dict['logvars_context'].cpu()]
+                labels += [data_dict['targets']]
 
-        means = torch.cat(means, dim=0)
-        logvars = torch.cat(logvars, dim=0)
-        labels = torch.cat(labels, dim=0)
+            # import ipdb; ipdb.set_trace()
+            means = torch.cat(means, dim=0)
+            logvars = torch.cat(logvars, dim=0)
+            labels = torch.cat(labels, dim=0)
 
-        # calculate KL
+            # calculate KL
+            # import ipdb; ipdb.set_trace()
+            means = means[:, None].expand(-1, means_classes.size()[0], -1)
+            logvars = logvars[:, None].expand(-1, logvars_classes.size()[0], -1)
+            means_classes = means_classes[None].expand(means.size()[0], -1, -1)
+            logvars_classes = logvars_classes[None].expand(logvars.size()[0], -1, -1)
 
-        means = means[:, None].expand(-1, means_classes.size()[0], -1)
-        logvars = logvars[:, None].expand(-1, logvars_classes.size()[0], -1)
-        means_classes = means_classes[None].expand(means.size()[0], -1, -1)
-        logvars_classes = logvars_classes[None].expand(logvars.size()[0], -1, -1)
+            kls = KLDivergence.calculate_kl(logvars, logvars_classes, means_classes, means).numpy()
 
-        kls = KLDivergence.calculate_kl(logvars, logvars_classes, means_classes, means).numpy()
+            argmins = np.argmin(kls, axis=1)
 
-        argmins = np.argmin(kls, axis=1)
+            chosen_labels = labels_classes.numpy()[argmins]
+            pred_labels_list += list(chosen_labels)
 
-        chosen_labels = labels_classes.numpy()[argmins]
+            true_labels = labels.numpy()
+            true_labels_list += list(true_labels)
 
-        true_labels = labels.numpy()
+            accuracy = (true_labels == chosen_labels).sum()/len(true_labels)
 
-        accuracy = (true_labels == chosen_labels).sum()/len(true_labels)
+            accuracies += [accuracy]
 
-        accuracies += [accuracy]
+            # test_dataset.sample_experiment()
 
-        # test_dataset.sample_experiment()
 
-accuracy = np.array(accuracies, dtype=np.float).mean()
+        accuracy = np.array(accuracies).mean()
+        overall_accuracies.append(accuracy)
 
-print(f'accuracy for num_classes = {opts.num_classes}, \
-train samples = {opts.num_data_per_dataset}, mnist = {opts.test_mnist}, accuracy = {accuracy}')
+        stdev = np.array(accuracies).std()
+        conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
+
+        # import seaborn as sns
+        # cm_plot = sns.heatmap(conf_matrix)
+        # fig = cm_plot.get_figure()
+        # fig.savefig("confusion_matrix.png")
+
+        accuracy_by_class = np.zeros(conf_matrix.shape[0])
+        for i, row in enumerate(conf_matrix):
+            accuracy_by_class[i] = row[i] / np.sum(row)
+
+        plt.figure()
+        plt.hist(x=accuracy_by_class, bins=30, color='#0504aa', alpha=0.7, rwidth=0.85)
+        plt.grid(axis='y', alpha=0.75)
+        plt.axvline(x=accuracy, label="Overall Accuracy")
+        plt.ylabel('Number of classes', fontsize=14)
+        plt.xlabel('Accuracy', fontsize=14)
+        plt.legend(prop={'size': 12})
+        plt.tight_layout()
+        plt.savefig(f"class_accuracy_hist_{k}.png")
+
+        plt.figure()
+        plt.hist(x=accuracies, bins=30, color='#0504aa', alpha=0.7, rwidth=0.85)
+        plt.grid(axis='y', alpha=0.75)
+        plt.axvline(x=accuracy, label="Overall Accuracy")
+        plt.ylabel('Number of trials', fontsize=14)
+        plt.xlabel('Accuracy', fontsize=14)
+        plt.legend(prop={'size': 12})
+        plt.tight_layout()
+        plt.savefig(f"trial_accuracy_hist_{k}.png")
+
+
+        print(f'accuracy for num_classes = {opts.num_classes}, \
+        train samples = {opts.num_data_per_dataset}, mnist = {opts.test_mnist}, accuracy = {accuracy}, std = {stdev}')
+
+    print(overall_accuracies)
