@@ -1,0 +1,6 @@
+k-shot/
+model_params/
+synthetic/
+mnist/
+omniglot/
+logs/
