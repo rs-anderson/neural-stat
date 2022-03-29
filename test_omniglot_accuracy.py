@@ -50,7 +50,8 @@ parser.add_argument('--x_dim', type=int, default=1, help='dimension of input')
 parser.add_argument('--h_dim', type=int, default=4096, help='dimension of input')
 
 # Logging options
-parser.add_argument('--model_name', type=str, default='omniglot/samples_x-means_c-400_epochs/last')
+# parser.add_argument('--model_name', type=str, default='omniglot/samples_x-means_c-400_epochs/last')
+parser.add_argument('--model_name', type=str, default='omniglot_26:03:2022_23:02:39/180')
 parser.add_argument('--model_dir', type=str, default='model_params')
 parser.add_argument('--result_dir', type=str, default='results')
 
@@ -80,7 +81,8 @@ dataset_name = 'mnist' if opts.test_mnist else 'omniglot'
 
 with torch.no_grad():
     overall_accuracies = []
-    for k in range(50):
+    # for k in range(50):
+    for k in [2021]:
         accuracies = []
         pred_labels_list = []
         true_labels_list = []
@@ -144,7 +146,6 @@ with torch.no_grad():
             true_labels_list += list(true_labels)
 
             accuracy = (true_labels == chosen_labels).sum()/len(true_labels)
-
             accuracies += [accuracy]
 
             # test_dataset.sample_experiment()
@@ -155,6 +156,8 @@ with torch.no_grad():
 
         stdev = np.array(accuracies).std()
         conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
+
+        # check if any labels have more than 100 
 
         # import seaborn as sns
         # cm_plot = sns.heatmap(conf_matrix)
@@ -188,5 +191,7 @@ with torch.no_grad():
 
         print(f'accuracy for num_classes = {opts.num_classes}, \
         train samples = {opts.num_data_per_dataset}, mnist = {opts.test_mnist}, accuracy = {accuracy}, std = {stdev}')
+
+        import ipdb; ipdb.set_trace()
 
     print(overall_accuracies)
